@@ -1,0 +1,16 @@
+#!/bin/python
+import sys
+from subprocess import check_output, run
+
+bfiles = check_output(["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"])
+files = [f for f in bfiles.decode('utf-8').split("\n") if f != ""]
+
+for f in files:
+    print(f)
+    if ".kicad_sch" in f and "MiniSumoPCB" in f:
+        print("Updating sch")
+        pdfFile = f.replace(".kicad_sch", ".pdf")
+        run(["kicad-cli", "sch", "export", "pdf", "-o", pdfFile, f ])
+        run(["git", "add" , pdfFile])
+
+sys.exit(0)
