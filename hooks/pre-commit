@@ -7,7 +7,7 @@ files = [f for f in bfiles.decode('utf-8').split("\n") if f != ""]
 
 for f in files:
     print(f)
-    if ".kicad_sch" in f and "MiniSumoPCB" in f:
+    if ".kicad_sch" in f and "MiniSumoPCB.kicad_sch" in f:
         print("Updating sch")
         pdfFile = f.replace(".kicad_sch", ".pdf")
         run(["kicad-cli", "sch", "export", "pdf", "-o", pdfFile, f ])
