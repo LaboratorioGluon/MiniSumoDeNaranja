@@ -1,0 +1,6 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "Espressif")(type "KiCad")(uri "E:/LaboratorioGluon/Proyectos/@Common/KicadLibs/kicad-libraries/libraries/Espressif.kicad_sym")(options "")(descr ""))
+  (lib (name "GluonLib")(type "KiCad")(uri "E:/LaboratorioGluon/Proyectos/@Common/KicadLibs/GluonLib.kicad_sym")(options "")(descr ""))
+  (lib (name "YoutubeLib")(type "KiCad")(uri "${KIPRJMOD}/YoutubeLib.kicad_sym")(options "")(descr ""))
+)
