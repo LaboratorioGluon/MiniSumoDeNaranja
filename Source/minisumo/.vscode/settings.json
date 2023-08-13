@@ -1,0 +1,11 @@
+{
+    "cmake.configureOnOpen": false,
+    "files.associations": {
+        "memory": "cpp",
+        "random": "cpp",
+        "limits": "cpp",
+        "type_traits": "cpp",
+        "atomic": "cpp",
+        "cstdint": "cpp"
+    }
+}
