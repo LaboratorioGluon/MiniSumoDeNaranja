@@ -10954,7 +10954,7 @@
   (gr_text "SDA" (at 169.6055 89.446 90) (layer "B.SilkS") (tstamp 8ccf60f5-8b5b-42ba-afe9-cb70d57c8cf7)
     (effects (font (size 1 1) (thickness 0.15)) (justify left bottom mirror))
   )
-  (gr_text "araba_st\nspuertes\nandygm_\nvitorio08\ncarlosbetdev\njfelipe_mg\ngorn6_\nfisitronics\ndavid_wiki\nhumiltat\npipermind\nfamedst\ntxusev\nraupulus\n" (at 138.43 71.793 -90) (layer "B.SilkS") (tstamp 9c7e5231-c662-48fb-ab95-f9a91b164008)
+  (gr_text "araba_st\nspuertes\nandygm_\nvitorio08\ncarlosbetdev\njfelipe_mg\ngorn6_\nfisitronics\ndavid_wiki\nhumiltat\npipermind\nfamedst\ntxusev\nraupulus\nzurano_\n" (at 138.43 71.793 270) (layer "B.SilkS") (tstamp 9c7e5231-c662-48fb-ab95-f9a91b164008)
     (effects (font (size 1 1) (thickness 0.15)) (justify left top mirror))
   )
   (gr_text "3v3" (at 173.9235 89.446 90) (layer "B.SilkS") (tstamp ac687776-4519-4c3f-9fc4-098b1aff7f0e)
