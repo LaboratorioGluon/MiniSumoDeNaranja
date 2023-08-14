@@ -2,13 +2,18 @@
 import sys
 from subprocess import check_output, run
 
+MAIN_PCB_FILENAME="MiniSumoPCB"
+
+# List modified files
 bfiles = check_output(["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"])
+
+# Take file names list
 files = [f for f in bfiles.decode('utf-8').split("\n") if f != ""]
 
 for f in files:
-    print(f)
-    if ".kicad_sch" in f and "MiniSumoPCB.kicad_sch" in f:
-        print("Updating sch")
+
+    # Check if we have our main PCB file modified, if so, regenerate pdf
+    if MAIN_PCB_FILENAME+".kicad_sch" in f:
         pdfFile = f.replace(".kicad_sch", ".pdf")
         run(["kicad-cli", "sch", "export", "pdf", "-o", pdfFile, f ])
         run(["git", "add" , pdfFile])
