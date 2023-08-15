@@ -11244,7 +11244,7 @@
   (gr_text "3v3" (at 173.99 92.494 90) (layer "F.SilkS") (tstamp 06356c9c-0d32-469b-9f11-7df37eda588b)
     (effects (font (size 1 1) (thickness 0.15)) (justify left bottom))
   )
-  (gr_text "MiniSumo de Naranja v1.0" (at 127.762 86.652) (layer "F.SilkS") (tstamp 0cdba1c5-b312-4286-b54c-3380d99829f3)
+  (gr_text "MiniSumo de Naranja v1.1" (at 127.762 86.652) (layer "F.SilkS") (tstamp 0cdba1c5-b312-4286-b54c-3380d99829f3)
     (effects (font (size 1.2 1.2) (thickness 0.2) bold) (justify left bottom))
   )
   (gr_text "G" (at 160.02 47.917 90) (layer "F.SilkS") (tstamp 231b0e4f-b63d-4272-a8ff-c465ea8bb298)
