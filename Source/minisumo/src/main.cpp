@@ -1,17 +1,19 @@
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/timers.h"
-#include "esp_timer.h"
-#include "esp_http_client.h"
-#include "nvs_flash.h"
-#include "esp_https_ota.h"
-
+#include <freertos/FreeRTOS.h>
+#include <freertos/timers.h>
+#include <esp_timer.h>
+#include <esp_http_client.h>
+#include <nvs_flash.h>
+#include <esp_https_ota.h>
+#include <esp_log.h>
 #include <stdint.h>
 
 #include "motorController.h"
 #include "vl53l0x.h"
 #include "labVl53l0x.h"
-#include "esp_log.h"
+#include "commander.h"
+#include "i2cExpander.h"
+#include "sensors.h"
 
 #include "secret.h"
 
@@ -39,6 +41,8 @@ uint16_t rangeMeasurement = 0;
 
 MotorController motors(GPIO_NUM_5, GPIO_NUM_18, GPIO_NUM_19, GPIO_NUM_21);
 labVL53L0X rangeSensor;
+Sensors sensors;
+Commander commander;
 
 void foo(){
 
@@ -106,11 +110,13 @@ void Init()
 
     motors.Init();
 
-    rangeSensor.i2cMasterInit(GPIO_NUM_4,GPIO_NUM_22);
+    sensors.Init();
+
+    /*rangeSensor.i2cMasterInit(GPIO_NUM_4,GPIO_NUM_22);
     if (!rangeSensor.Init(VL53L0X_DEVICEMODE_CONTINUOUS_RANGING))
     {
         ESP_LOGE(TAG, "Failed to initialize VL53L0X :(");
-    }
+    }*/
 }
 
 void Wait()
@@ -157,8 +163,8 @@ void loopAttack()
 {
     ESP_LOGE(TAG," Loop Attack...");
     motors.setDirection(MotorController::FWD);
-    bool ret = rangeSensor.readContiniousLastData(&rangeMeasurement);
-    ESP_LOGE(TAG, "Result(%d), %d", ret, rangeMeasurement);
+    /*bool ret = rangeSensor.readContiniousLastData(&rangeMeasurement);
+    ESP_LOGE(TAG, "Result(%d), %d", ret, rangeMeasurement);*/
     if (rangeMeasurement > 200)
     {
         changeState(SEARCHING);
@@ -178,8 +184,8 @@ void loopSearching()
 
     motors.setDirection(MotorController::RIGHT);
     //uint64_t start = esp_timer_get_time();
-    bool ret = rangeSensor.readContiniousLastData(&rangeMeasurement);
-    ESP_LOGE(TAG, "Result(%d), %d", ret, rangeMeasurement);
+    /*bool ret = rangeSensor.readContiniousLastData(&rangeMeasurement);
+    ESP_LOGE(TAG, "Result(%d), %d", ret, rangeMeasurement);*/
 
     //ESP_LOGE(TAG, "Time: %" PRId64 "\n", esp_timer_get_time()-start);
     if (rangeMeasurement < 200)
@@ -204,27 +210,6 @@ enum CMD{
     END_CIVILIZATION_WITH_NUKE_RED_BUTTON_ADMIN_123,
     UPDATE_FW
 };
-
-char lastCommand[50] = {0};
-uint8_t commandRunning=0; // If 0 : Do normal execution, otherwise, dont do the main loop
-void loopCommands()
-{
-    memset(lastCommand, 0, 50);
-
-    esp_http_client_config_t config = {
-        .url = "http://192.168.1.133:8000/commands.html",
-        .user_data = lastCommand,        // Pass address of local buffer to get response
-    };
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-    esp_http_client_open(client,0);
-    esp_http_client_fetch_headers(client);
-    esp_http_client_read(client, lastCommand, esp_http_client_get_content_length(client));
-
-    ESP_LOGE(TAG,"Received html: %s", lastCommand);
-
-    esp_http_client_close(client);
-    esp_http_client_cleanup(client);
-}
 
 
 
@@ -252,8 +237,15 @@ void updateOTA()
     }
 }
 
+
+uint8_t commandRunning; // If 0 : Do normal execution, otherwise, dont do the main loop
 void doCommand()
 {
+
+    char lastCommand[50];
+    commander.updateCommand();
+    commander.getLastCommand(lastCommand, 50);
+
     if( !strcmp(lastCommand, "UPDATE_FW"))
     {
         ESP_LOGE(TAG,"NEW VERSION!!!");
@@ -293,21 +285,42 @@ void doCommand()
     }
     
 }
-
-
 // Fin Micro FSM
 
-void app_main() 
+void coreAThread(void *arg)
 {
-    ESP_LOGE(TAG, "Iniciando software");
-    Init();
-
-    Wait();
-
-    MotorController::DIRECTION dir = MotorController::DIRECTION::STOP;
-
+    ESP_LOGE(TAG, "Iniciando CORE A");
     uint32_t counter = 0;
     uint64_t start = esp_timer_get_time();
+    MotorController::DIRECTION dir = MotorController::DIRECTION::STOP;
+    uint8_t cnt= 0;
+    uint16_t tofSensorData[NUM_TOF_SENSORS];
+    while(true)
+    {
+        sensors.getTof(tofSensorData);
+        //ESP_LOGE(TAG,"Sensor: %lu", tofSensorData[0]);
+
+        if(!commandRunning)
+        {
+            // Check dohyo lines
+            // if true: currentState = Evading
+
+            // loop of current state
+            funcs[currentState]();
+        }
+
+        #ifdef ENABLE_OTA
+        // Recibir comandos y autoactualizarnos
+        if(counter%10 == 0)
+        {
+            doCommand();
+        }
+        counter++;
+        #endif
+        
+        vTaskDelay(pdMS_TO_TICKS(200));
+    }
+
     while( true )
     {
         
@@ -319,24 +332,45 @@ void app_main()
             // loop of current state
             funcs[currentState]();
         }
+
         #ifdef ENABLE_OTA
-        
         // Recibir comandos y autoactualizarnos
-
-        #endif
-
-        // Todo: Remove in release
         if(counter%100 == 0)
         {
-            loopCommands();
             doCommand();
         }
         counter++;
+        #endif
 
-
-        vTaskDelay(pdMS_TO_TICKS(20));
+        vTaskDelay(pdMS_TO_TICKS(200));
 
     }
+}
+
+void coreBThread(void *arg)
+{
+    ESP_LOGE(TAG, "Iniciando CORE B");
+    uint8_t cnt = 0;
+    while(true){
+        sensors.updadeTof();
+        //sensors.updateLine();
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
+}
+
+TaskHandle_t mainCoreHandle;
+TaskHandle_t sensorCoreHandle;
+
+void app_main() 
+{
+    ESP_LOGE(TAG, "Iniciando software");
+    Init();
+
+    Wait();
+
+    xTaskCreatePinnedToCore(coreAThread, "Main_core",   4096, NULL, 10, &mainCoreHandle, 0);
+    xTaskCreatePinnedToCore(coreBThread, "Sensor_Core", 4096, NULL, 10, &sensorCoreHandle, 1);
+    
 
 #if 0
     while(true)
@@ -376,37 +410,3 @@ void app_main()
     }
 #endif 
 }
-
-
-
-
-#if 0
-
-void loop()
-{
-    // Robot es tonto. Es un ente controlado por main.
-
-    sensor X = robot.leerSensores(); // Guarda el sensor que detecta al enemigo más cerca. 
-    //-1 : Si no hay ninguno
-
-    if (SEnsores de linea se han activado)
-    {
-        direction = EVADE;
-    }
-    else
-    {
-        switch(X)
-        {
-            case F: direction = FWD;
-            case R: direction = RIGHT;
-            case L: direction = LEFT;
-        }
-    }
-
-    
-    robot.move(direction);
-
-    //robot.weapon(Weapon);
-}
-
-#endif
