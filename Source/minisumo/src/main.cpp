@@ -43,6 +43,7 @@ MotorController motors(GPIO_NUM_5, GPIO_NUM_18, GPIO_NUM_19, GPIO_NUM_21);
 labVL53L0X rangeSensor;
 Sensors sensors;
 Commander commander;
+uint16_t tofSensorData[NUM_TOF_SENSORS];
 
 void foo(){
 
@@ -163,8 +164,7 @@ void loopAttack()
 {
     ESP_LOGE(TAG," Loop Attack...");
     motors.setDirection(MotorController::FWD);
-    /*bool ret = rangeSensor.readContiniousLastData(&rangeMeasurement);
-    ESP_LOGE(TAG, "Result(%d), %d", ret, rangeMeasurement);*/
+    rangeMeasurement = tofSensorData[0];
     if (rangeMeasurement > 200)
     {
         changeState(SEARCHING);
@@ -183,11 +183,7 @@ void loopSearching()
     ESP_LOGE(TAG," Loop Searching...");
 
     motors.setDirection(MotorController::RIGHT);
-    //uint64_t start = esp_timer_get_time();
-    /*bool ret = rangeSensor.readContiniousLastData(&rangeMeasurement);
-    ESP_LOGE(TAG, "Result(%d), %d", ret, rangeMeasurement);*/
-
-    //ESP_LOGE(TAG, "Time: %" PRId64 "\n", esp_timer_get_time()-start);
+    rangeMeasurement = tofSensorData[0];
     if (rangeMeasurement < 200)
     {
         changeState(ATTACKING);
@@ -294,7 +290,7 @@ void coreAThread(void *arg)
     uint64_t start = esp_timer_get_time();
     MotorController::DIRECTION dir = MotorController::DIRECTION::STOP;
     uint8_t cnt= 0;
-    uint16_t tofSensorData[NUM_TOF_SENSORS];
+    
     while(true)
     {
         sensors.getTof(tofSensorData);
