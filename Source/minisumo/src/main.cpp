@@ -6,6 +6,8 @@
 #include <nvs_flash.h>
 #include <esp_https_ota.h>
 #include <esp_log.h>
+//#include <driver/adc.h>
+#include <esp_adc/adc_continuous.h>
 #include <stdint.h>
 
 #include "motorController.h"
@@ -14,6 +16,7 @@
 #include "commander.h"
 #include "i2cExpander.h"
 #include "sensors.h"
+#include "configLoader.h"
 
 #include "secret.h"
 
@@ -45,6 +48,21 @@ Sensors sensors;
 Commander commander;
 uint16_t tofSensorData[NUM_TOF_SENSORS];
 
+uint8_t isrTriggered = 0;
+
+static void IRAM_ATTR gpio_isr_handler(void* arg)
+{
+    isrTriggered= 1;
+}
+
+enum STARTUP_CONFIG{
+    START_INVALID_CONFIG = -1,
+    START_ENEMY_FWD = 0,
+    START_ENEMY_RIGHT,
+    START_ENEMY_LEFT,
+    START_ENEMY_BACK,
+} startupConfig;
+
 void foo(){
 
     gpio_config_t io_conf = {};
@@ -65,28 +83,9 @@ void foo(){
     io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
     gpio_config(&io_conf);
 
-    /*gpio_set_level(GPIO_NUM_2, 0);
-    vTaskDelay(pdMS_TO_TICKS(500));
-    gpio_set_level(GPIO_NUM_2, 1);
-    vTaskDelay(pdMS_TO_TICKS(500));
-    gpio_set_level(GPIO_NUM_2, 0);
-    vTaskDelay(pdMS_TO_TICKS(500));
-    gpio_set_level(GPIO_NUM_2, 1);
-    vTaskDelay(pdMS_TO_TICKS(500));
-    gpio_set_level(GPIO_NUM_2, 0);
-    vTaskDelay(pdMS_TO_TICKS(500));
-    gpio_set_level(GPIO_NUM_2, 1);*/
-
-    /*while(true)
-    {
-        gpio_set_level(GPIO_NUM_2, gpio_get_level(GPIO_NUM_23));
-        vTaskDelay(pdMS_TO_TICKS(50));
-    }*/
 }
 
-
 // Micro FSM Moore
-
 enum STATES{
     SEARCHING = 0,
     ATTACKING,
@@ -108,10 +107,42 @@ void Init()
 
     foo();
 
-
     motors.Init();
-
     sensors.Init();
+
+    startupConfig = (STARTUP_CONFIG)loadConfig();
+
+    if (startupConfig == START_INVALID_CONFIG)
+    {
+        // Todo: Inform with LED.
+        ESP_LOGE(TAG, "Error invalid config!");
+    }
+    else
+    {
+        ESP_LOGE(TAG, "Current config: %d", startupConfig);
+    }
+
+    gpio_config_t io_conf = {};
+
+    // Configure pins for MotorA
+    io_conf.intr_type = GPIO_INTR_POSEDGE;
+    io_conf.mode = GPIO_MODE_INPUT;
+    io_conf.pin_bit_mask = (1ULL << GPIO_NUM_35);
+    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+    gpio_config(&io_conf);
+
+    gpio_install_isr_service(0);
+    gpio_isr_handler_add(GPIO_NUM_35, gpio_isr_handler, nullptr);
+
+    while(true){
+        if(isrTriggered == 1)
+        {
+            ESP_LOGE(TAG,"Triggered!");
+            isrTriggered = 0;
+        }
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
 
     /*rangeSensor.i2cMasterInit(GPIO_NUM_4,GPIO_NUM_22);
     if (!rangeSensor.Init(VL53L0X_DEVICEMODE_CONTINUOUS_RANGING))
@@ -152,7 +183,6 @@ void changeState(enum STATES newState)
 
 void loopEvading()
 {
-    //ESP_LOGE(TAG," Loop Evading...");
     if(esp_timer_get_time() > currentStateStart + 1000000)
     {
         changeState(SEARCHING);
@@ -169,12 +199,6 @@ void loopAttack()
     {
         changeState(SEARCHING);
     }
-
-    /*if(esp_timer_get_time() > currentStateStart + 3000000)
-    {
-        changeState(EVADING);
-    }*/
-
 }
 
 
@@ -287,10 +311,7 @@ void coreAThread(void *arg)
 {
     ESP_LOGE(TAG, "Iniciando CORE A");
     uint32_t counter = 0;
-    uint64_t start = esp_timer_get_time();
-    MotorController::DIRECTION dir = MotorController::DIRECTION::STOP;
-    uint8_t cnt= 0;
-    
+
     while(true)
     {
         sensors.getTof(tofSensorData);
@@ -315,38 +336,13 @@ void coreAThread(void *arg)
         #endif
         
         vTaskDelay(pdMS_TO_TICKS(200));
-    }
-
-    while( true )
-    {
-        
-        if(!commandRunning)
-        {
-            // Check dohyo lines
-            // if true: currentState = Evading
-
-            // loop of current state
-            funcs[currentState]();
-        }
-
-        #ifdef ENABLE_OTA
-        // Recibir comandos y autoactualizarnos
-        if(counter%100 == 0)
-        {
-            doCommand();
-        }
-        counter++;
-        #endif
-
-        vTaskDelay(pdMS_TO_TICKS(200));
-
+        //taskYIELD();
     }
 }
 
 void coreBThread(void *arg)
 {
     ESP_LOGE(TAG, "Iniciando CORE B");
-    uint8_t cnt = 0;
     while(true){
         sensors.updadeTof();
         //sensors.updateLine();
@@ -361,48 +357,9 @@ void app_main()
 {
     ESP_LOGE(TAG, "Iniciando software");
     Init();
-
     Wait();
 
     xTaskCreatePinnedToCore(coreAThread, "Main_core",   4096, NULL, 10, &mainCoreHandle, 0);
     xTaskCreatePinnedToCore(coreBThread, "Sensor_Core", 4096, NULL, 10, &sensorCoreHandle, 1);
-    
 
-#if 0
-    while(true)
-    {
-        if(gpio_get_level(GPIO_NUM_23))
-        {
-            dir = MotorController::STOP;
-            gpio_set_level(GPIO_NUM_2, 0);
-        }
-        else
-        {
-            gpio_set_level(GPIO_NUM_2, 1);
-            dir = MotorController::FWD;
-        }
-        /*if(gpio_get_level(GPIO_NUM_23))
-        {
-            motors.setDirection(MotorController::BACK);
-            vTaskDelay(pdMS_TO_TICKS(500));
-            motors.setDirection(MotorController::RIGHT);
-            vTaskDelay(pdMS_TO_TICKS(500));
-        }
-        else
-            dir = MotorController::FWD;*/
-        
-        motors.setDirection(dir);
-        /*switch(dir)
-        {
-        case MotorController::STOP: dir = MotorController::FWD; break;
-        case MotorController::FWD: dir = MotorController::RIGHT; break;
-        case MotorController::RIGHT: dir = MotorController::LEFT; break;
-        case MotorController::LEFT: dir = MotorController::BACK; break;
-        case MotorController::BACK: dir = MotorController::STOP; break;
-        }*/
-        rangeSensor.readSingleWithPolling(&rangeMeasurement);
-        ESP_LOGE(TAG, "Range sensor: %d", rangeMeasurement);
-        vTaskDelay(pdMS_TO_TICKS(500));
-    }
-#endif 
 }

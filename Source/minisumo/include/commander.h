@@ -25,7 +25,6 @@ public:
 private:
     char lastCommand[MAX_COMMAND_LEN];
 
-
 };
 
 #endif //__COMMANDER_H__
