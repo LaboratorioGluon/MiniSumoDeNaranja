@@ -16,17 +16,6 @@ bool labVL53L0X::Init(VL53L0X_DeviceModes devMode)
         gpio_set_level(gpio_xshut, 1);
     }
 
-    /*if (gpio_gpio1 != GPIO_NUM_MAX)
-    {
-        ESP_ERROR_CHECK(gpio_set_direction(gpio_gpio1, GPIO_MODE_INPUT));
-        ESP_ERROR_CHECK(gpio_set_pull_mode(gpio_gpio1, GPIO_PULLUP_ONLY));
-        ESP_ERROR_CHECK(gpio_pullup_en(gpio_gpio1));
-        ESP_ERROR_CHECK(gpio_set_intr_type(gpio_gpio1, GPIO_INTR_POSEDGE));
-        ESP_ERROR_CHECK(gpio_install_isr_service(0));
-        ESP_ERROR_CHECK(gpio_isr_handler_add(gpio_gpio1, gpio1_isr, this));
-        ESP_ERROR_CHECK(gpio_intr_enable(gpio_gpio1));
-    }*/
-
     /* device init */
     vl53l0x_dev.i2c_port_num = i2c_port;
     vl53l0x_dev.i2c_address = VL53L0X_I2C_ADDRESS_DEFAULT;

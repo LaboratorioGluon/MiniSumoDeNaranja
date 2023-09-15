@@ -3,6 +3,9 @@
 
 #include "driver/gpio.h"
 
+/**
+ * Driver for TB6612FNG
+*/
 class MotorController
 {
 
@@ -17,7 +20,8 @@ public:
         BACK
     };
 
-    MotorController(gpio_num_t motorA1_, gpio_num_t motorA2_, gpio_num_t motorB1_, gpio_num_t motorB2_);
+    MotorController( gpio_num_t motorA1_, gpio_num_t motorA2_, gpio_num_t motorAPwm_, 
+                     gpio_num_t motorB1_, gpio_num_t motorB2_, gpio_num_t motorBPwm_  );
 
     void Init();
 
@@ -25,8 +29,8 @@ public:
 
 private:
 
-    gpio_num_t motorA1, motorA2;
-    gpio_num_t motorB1, motorB2;
+    gpio_num_t motorA1, motorA2, motorAPwm;
+    gpio_num_t motorB1, motorB2, motorBPwm;
 
 };
 

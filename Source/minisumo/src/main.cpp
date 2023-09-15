@@ -10,6 +10,7 @@
 #include <esp_adc/adc_continuous.h>
 #include <stdint.h>
 
+#include "hwInterface.h"
 #include "motorController.h"
 #include "vl53l0x.h"
 #include "labVl53l0x.h"
@@ -42,7 +43,7 @@ extern "C" void app_main();
 
 uint16_t rangeMeasurement = 0;
 
-MotorController motors(GPIO_NUM_5, GPIO_NUM_18, GPIO_NUM_19, GPIO_NUM_21);
+MotorController motors(PIN_MOTOR_A_IN1, PIN_MOTOR_A_IN2, PIN_MOTOR_A_PWM, PIN_MOTOR_B_IN1,PIN_MOTOR_B_IN2, PIN_MOTOR_B_PWM);
 labVL53L0X rangeSensor;
 Sensors sensors;
 Commander commander;
@@ -50,9 +51,17 @@ uint16_t tofSensorData[NUM_TOF_SENSORS];
 
 uint8_t isrTriggered = 0;
 
+static TaskHandle_t initTask = NULL;
+static TaskHandle_t mainCoreHandle = NULL;
+static TaskHandle_t sensorCoreHandle = NULL;
+
 static void IRAM_ATTR gpio_isr_handler(void* arg)
 {
     isrTriggered= 1;
+    if(initTask != NULL)
+    {
+        vTaskNotifyGiveFromISR(initTask, NULL);
+    }
 }
 
 enum STARTUP_CONFIG{
@@ -97,6 +106,7 @@ int64_t currentStateStart = 0;
 
 void Init()
 {
+    initTask = xTaskGetCurrentTaskHandle();
 
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -127,7 +137,7 @@ void Init()
     // Configure pins for MotorA
     io_conf.intr_type = GPIO_INTR_POSEDGE;
     io_conf.mode = GPIO_MODE_INPUT;
-    io_conf.pin_bit_mask = (1ULL << GPIO_NUM_35);
+    io_conf.pin_bit_mask = ( 1ULL << GPIO_NUM_35);
     io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
     io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
     gpio_config(&io_conf);
@@ -135,30 +145,20 @@ void Init()
     gpio_install_isr_service(0);
     gpio_isr_handler_add(GPIO_NUM_35, gpio_isr_handler, nullptr);
 
-    while(true){
-        if(isrTriggered == 1)
-        {
-            ESP_LOGE(TAG,"Triggered!");
-            isrTriggered = 0;
-        }
-        vTaskDelay(pdMS_TO_TICKS(10));
-    }
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY );
+    ESP_LOGE(TAG,"Triggered!!");
 
-    /*rangeSensor.i2cMasterInit(GPIO_NUM_4,GPIO_NUM_22);
-    if (!rangeSensor.Init(VL53L0X_DEVICEMODE_CONTINUOUS_RANGING))
-    {
-        ESP_LOGE(TAG, "Failed to initialize VL53L0X :(");
-    }*/
+    // Wait 5 seconds mandatory by the rules.
+    vTaskDelay(pdMS_TO_TICKS(5000));
+
+    ESP_LOGE(TAG, "Robot encendido");
 }
 
-void Wait()
+void EnableWifi()
 {
 #ifdef ENABLE_OTA
     wifi_init_sta();
-#else
-    vTaskDelay(pdMS_TO_TICKS(5000));
 #endif
-
 }
 
 
@@ -200,7 +200,6 @@ void loopAttack()
         changeState(SEARCHING);
     }
 }
-
 
 void loopSearching()
 {   
@@ -350,14 +349,12 @@ void coreBThread(void *arg)
     }
 }
 
-TaskHandle_t mainCoreHandle;
-TaskHandle_t sensorCoreHandle;
 
 void app_main() 
 {
     ESP_LOGE(TAG, "Iniciando software");
     Init();
-    Wait();
+    EnableWifi();
 
     xTaskCreatePinnedToCore(coreAThread, "Main_core",   4096, NULL, 10, &mainCoreHandle, 0);
     xTaskCreatePinnedToCore(coreBThread, "Sensor_Core", 4096, NULL, 10, &sensorCoreHandle, 1);
