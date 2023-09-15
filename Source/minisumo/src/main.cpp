@@ -18,6 +18,7 @@
 #include "i2cExpander.h"
 #include "sensors.h"
 #include "configLoader.h"
+#include "informer.h"
 
 #include "secret.h"
 
@@ -47,6 +48,7 @@ MotorController motors(PIN_MOTOR_A_IN1, PIN_MOTOR_A_IN2, PIN_MOTOR_A_PWM, PIN_MO
 labVL53L0X rangeSensor;
 Sensors sensors;
 Commander commander;
+Informer informer(PIN_LED_1, PIN_LED_2);
 uint16_t tofSensorData[NUM_TOF_SENSORS];
 
 uint8_t isrTriggered = 0;
@@ -72,6 +74,7 @@ enum STARTUP_CONFIG{
     START_ENEMY_BACK,
 } startupConfig;
 
+/*
 void foo(){
 
     gpio_config_t io_conf = {};
@@ -93,6 +96,7 @@ void foo(){
     gpio_config(&io_conf);
 
 }
+*/
 
 // Micro FSM Moore
 enum STATES{
@@ -115,10 +119,12 @@ void Init()
     }
     ESP_ERROR_CHECK(err);
 
-    foo();
+    //foo();
 
     motors.Init();
     sensors.Init();
+    informer.Init();
+    informer.setStatus(Informer::STARTING);
 
     startupConfig = (STARTUP_CONFIG)loadConfig();
 
@@ -145,12 +151,13 @@ void Init()
     gpio_install_isr_service(0);
     gpio_isr_handler_add(GPIO_NUM_35, gpio_isr_handler, nullptr);
 
+    informer.setStatus(Informer::WAITING_PUSH_BUTTON);
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY );
     ESP_LOGE(TAG,"Triggered!!");
-
+    informer.setStatus(Informer::WAITING_5S);
     // Wait 5 seconds mandatory by the rules.
     vTaskDelay(pdMS_TO_TICKS(5000));
-
+    informer.setStatus(Informer::RUNNING);
     ESP_LOGE(TAG, "Robot encendido");
 }
 
@@ -193,6 +200,7 @@ void loopEvading()
 void loopAttack()
 {
     ESP_LOGE(TAG," Loop Attack...");
+    informer.setStatus(Informer::TARGET_ADQUIRED);
     motors.setDirection(MotorController::FWD);
     rangeMeasurement = tofSensorData[0];
     if (rangeMeasurement > 200)
@@ -334,6 +342,7 @@ void coreAThread(void *arg)
         counter++;
         #endif
         
+        //informer.Update();
         vTaskDelay(pdMS_TO_TICKS(200));
         //taskYIELD();
     }
