@@ -1,7 +1,7 @@
 #ifndef __SENSORS_H__
 #define __SENSORS_H__
 
-#define NUM_TOF_SENSORS 4
+#define NUM_TOF_SENSORS 3
 #define NUM_LINE_SENSORS 2
 
 #include <freertos/FreeRTOS.h>

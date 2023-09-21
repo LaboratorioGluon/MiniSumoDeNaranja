@@ -16,14 +16,18 @@ void Sensors::Init()
     xSemaphoreGive(semaphore);
 
     tca.InitI2cMaster();
-    tca.selectPort(0);
 
-    ESP_LOGE(TAG,"Sempahore: %lu", (uint32_t)semaphore);
 
-    if (!rangeSensor.Init(VL53L0X_DEVICEMODE_CONTINUOUS_RANGING))
+    for( uint8_t i = 0;i < NUM_TOF_SENSORS; i++)
     {
-        ESP_LOGE(TAG, "Failed to initialize VL53L0X :(");
+        tca.selectPort(i);
+        if (!rangeSensor.Init(VL53L0X_DEVICEMODE_CONTINUOUS_RANGING))
+        {
+            ESP_LOGE(TAG, "Failed to initialize VL53L0X :( %d", i);
+        }
     }
+
+
 }
 
 void Sensors::getTof(uint16_t _tofData[NUM_TOF_SENSORS])
@@ -46,14 +50,19 @@ void Sensors::getLine(uint16_t _lineData[NUM_LINE_SENSORS])
 
 void Sensors::updadeTof()
 {
-    uint16_t rangeMeasurement;
-    rangeSensor.readContiniousLastData(&rangeMeasurement);
-    if(xSemaphoreTake(semaphore, portMAX_DELAY) == pdTRUE)
+    uint16_t rangeMeasurement[NUM_TOF_SENSORS];
+    if (xSemaphoreTake(semaphore, portMAX_DELAY) == pdTRUE)
     {
-        tofData[0] = rangeMeasurement;
+        for (uint8_t i = 0; i < NUM_TOF_SENSORS; i++)
+        {
+            tca.selectPort(i);
+            rangeSensor.readContiniousLastData(&rangeMeasurement[i]);
+            //ESP_LOGE(TAG, "Sensor %u (%d) : %lu", i, ret, rangeMeasurement[i]);
+        }
+
+        memcpy(tofData, rangeMeasurement, NUM_TOF_SENSORS*sizeof(tofData[0]));
     }
     xSemaphoreGive(semaphore);
-
 }
 
 void Sensors::updateLine()

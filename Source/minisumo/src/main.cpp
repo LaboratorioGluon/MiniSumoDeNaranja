@@ -105,6 +105,14 @@ enum STATES{
     EVADING
 };
 
+void EnableWifi()
+{
+#ifdef ENABLE_OTA
+    wifi_init_sta();
+#endif
+}
+
+
 enum STATES currentState = SEARCHING;
 int64_t currentStateStart = 0;
 
@@ -118,13 +126,14 @@ void Init()
         err = nvs_flash_init();
     }
     ESP_ERROR_CHECK(err);
-
-    //foo();
+    
+    informer.Init();
+    informer.setStatus(Informer::STARTING);
 
     motors.Init();
     sensors.Init();
-    informer.Init();
-    informer.setStatus(Informer::STARTING);
+
+    EnableWifi();
 
     startupConfig = (STARTUP_CONFIG)loadConfig();
 
@@ -161,12 +170,6 @@ void Init()
     ESP_LOGE(TAG, "Robot encendido");
 }
 
-void EnableWifi()
-{
-#ifdef ENABLE_OTA
-    wifi_init_sta();
-#endif
-}
 
 
 void loopSearching();
@@ -322,8 +325,7 @@ void coreAThread(void *arg)
     while(true)
     {
         sensors.getTof(tofSensorData);
-        //ESP_LOGE(TAG,"Sensor: %lu", tofSensorData[0]);
-
+        ESP_LOGE(TAG,"Sensor: %lu, %lu, %lu", tofSensorData[0], tofSensorData[1], tofSensorData[2]);
         if(!commandRunning)
         {
             // Check dohyo lines
@@ -362,8 +364,9 @@ void coreBThread(void *arg)
 void app_main() 
 {
     ESP_LOGE(TAG, "Iniciando software");
+    
     Init();
-    EnableWifi();
+    
 
     xTaskCreatePinnedToCore(coreAThread, "Main_core",   4096, NULL, 10, &mainCoreHandle, 0);
     xTaskCreatePinnedToCore(coreBThread, "Sensor_Core", 4096, NULL, 10, &sensorCoreHandle, 1);

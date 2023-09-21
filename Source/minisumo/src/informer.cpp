@@ -66,6 +66,7 @@ void Informer::Update()
 {
     static uint64_t lastCall = esp_timer_get_time();
     uint64_t dt = esp_timer_get_time() - lastCall;
+    
     // Control of Red LED
     if (LedRPeriod == -1)
     {
