@@ -1,6 +1,9 @@
 #include "configLoader.h"
+#include <esp_log.h>
 
 #include "driver/adc.h"
+
+const char TAG[]= "CONFIG";
 
 int8_t loadConfig()
 {
@@ -13,6 +16,7 @@ int8_t loadConfig()
         adc_raw += adc1_get_raw(ADC1_CHANNEL_6);
     }
     adc_raw /= 10;
+    ESP_LOGE(TAG, "Raw value: %lu", adc_raw);
 
     int8_t configuration = -1;
 

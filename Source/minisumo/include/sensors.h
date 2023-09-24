@@ -17,7 +17,7 @@ public:
     void Init();
 
     void getTof(uint16_t _tofData[NUM_TOF_SENSORS]);
-    void getLine(uint16_t _lineData[NUM_LINE_SENSORS]);
+    void getLine(uint32_t _lineData[NUM_LINE_SENSORS]);
 
 
     void updadeTof();
@@ -31,7 +31,7 @@ private:
 
     /* Critical sections */
     uint16_t tofData[NUM_TOF_SENSORS];
-    uint16_t lineData[NUM_LINE_SENSORS];
+    uint32_t lineData[NUM_LINE_SENSORS];
 
 };
 

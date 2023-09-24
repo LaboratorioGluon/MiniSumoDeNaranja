@@ -8,6 +8,7 @@
 #include <esp_log.h>
 //#include <driver/adc.h>
 #include <esp_adc/adc_continuous.h>
+#include <driver/adc.h>
 #include <stdint.h>
 
 #include "hwInterface.h"
@@ -50,6 +51,8 @@ Sensors sensors;
 Commander commander;
 Informer informer(PIN_LED_1, PIN_LED_2);
 uint16_t tofSensorData[NUM_TOF_SENSORS];
+uint32_t lineSensorData[NUM_LINE_SENSORS];
+uint32_t lineStartValue[NUM_LINE_SENSORS];
 
 uint8_t isrTriggered = 0;
 
@@ -135,6 +138,16 @@ void Init()
 
     EnableWifi();
 
+    // Store line value
+    sensors.updateLine();
+
+    sensors.getLine(lineSensorData);
+
+    lineStartValue[0] = lineSensorData[0];
+    lineStartValue[1] = lineSensorData[1];
+    
+    ESP_LOGE(TAG, "Valor linea inicio: %lu, %lu", lineStartValue[0], lineStartValue[1]);
+
     startupConfig = (STARTUP_CONFIG)loadConfig();
 
     if (startupConfig == START_INVALID_CONFIG)
@@ -212,16 +225,59 @@ void loopAttack()
     }
 }
 
+
+uint8_t isRotating = 0;
+int32_t remainingRotation=0;
+int32_t remainingBack=0;
+#define DELTA_ROT 1
+
+void loopRotating()
+{
+    static uint64_t lastmicros = esp_timer_get_time();
+
+    if (remainingRotation <= 0)
+    {
+        // Volvemos a ir recto
+        isRotating = 0;
+    }
+    remainingRotation -= esp_timer_get_time() - lastmicros;
+    lastmicros = esp_timer_get_time();
+}
+
+
+
 void loopSearching()
 {   
-    ESP_LOGE(TAG," Loop Searching...");
+    //ESP_LOGE(TAG," Loop Searching...");
 
-    motors.setDirection(MotorController::RIGHT);
+    if( !isRotating)
+    {
+        motors.setDirection(MotorController::FWD);  
+        if ( lineSensorData[0] >  lineStartValue[0] * 1.25)
+        {
+            motors.setDirection(MotorController::RIGHT);
+            isRotating = 1;
+            remainingRotation = 300000;
+        }
+        else if ( lineSensorData[1] >  lineStartValue[1] * 1.25)
+        {
+            motors.setDirection(MotorController::LEFT);
+            isRotating = 1;
+            remainingRotation = 300000;
+        }
+    }
+    else
+    {
+        loopRotating();
+    }
+
     rangeMeasurement = tofSensorData[0];
-    if (rangeMeasurement < 200)
+
+
+    /*if (rangeMeasurement < 200)
     {
         changeState(ATTACKING);
-    }
+    }*/
 
     /*if(esp_timer_get_time() > currentStateStart + 5000000)
     {
@@ -325,7 +381,10 @@ void coreAThread(void *arg)
     while(true)
     {
         sensors.getTof(tofSensorData);
-        ESP_LOGE(TAG,"Sensor: %lu, %lu, %lu", tofSensorData[0], tofSensorData[1], tofSensorData[2]);
+        sensors.getLine(lineSensorData);
+        //ESP_LOGE(TAG,"Sensor: %lu, %lu, %lu", tofSensorData[0], tofSensorData[1], tofSensorData[2]);
+        ESP_LOGE(TAG,"Lineas :%lu, %lu", lineSensorData[0], lineSensorData[1]);
+
         if(!commandRunning)
         {
             // Check dohyo lines
@@ -345,7 +404,7 @@ void coreAThread(void *arg)
         #endif
         
         //informer.Update();
-        vTaskDelay(pdMS_TO_TICKS(200));
+        //vTaskDelay(pdMS_TO_TICKS(200));
         //taskYIELD();
     }
 }
@@ -355,8 +414,8 @@ void coreBThread(void *arg)
     ESP_LOGE(TAG, "Iniciando CORE B");
     while(true){
         sensors.updadeTof();
-        //sensors.updateLine();
-        vTaskDelay(pdMS_TO_TICKS(50));
+        sensors.updateLine();
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 

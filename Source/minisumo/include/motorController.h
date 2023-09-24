@@ -8,7 +8,6 @@
 */
 class MotorController
 {
-
 public:
 
     enum DIRECTION
