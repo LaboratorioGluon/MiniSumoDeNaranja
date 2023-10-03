@@ -18,7 +18,8 @@ void Sensors::Init()
     xSemaphoreGive(semaphore);
 
     tca.InitI2cMaster();
-
+    
+ 
     for( uint8_t i = 0;i < NUM_TOF_SENSORS; i++)
     {
         tca.selectPort(i);
@@ -26,6 +27,8 @@ void Sensors::Init()
         {
             ESP_LOGE(TAG, "Failed to initialize VL53L0X :( %d", i);
         }
+
+        rangeSensor.setThresholds(tofRateValue[i], tofThresholdValue[i]);
     }
 
     adc1_config_width(ADC_WIDTH_BIT_12);

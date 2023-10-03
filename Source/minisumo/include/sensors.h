@@ -29,6 +29,9 @@ private:
     
     i2cExpander tca;
 
+    uint32_t tofRateValue[NUM_TOF_SENSORS] = {65,70,70};
+    uint32_t tofThresholdValue[NUM_TOF_SENSORS] = {80,95,95};
+
     /* Critical sections */
     uint16_t tofData[NUM_TOF_SENSORS];
     uint32_t lineData[NUM_LINE_SENSORS];

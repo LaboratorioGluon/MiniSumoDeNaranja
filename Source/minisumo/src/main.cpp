@@ -42,6 +42,7 @@ static char TAG[] = "MAIN";
 extern "C" void app_main();
 
 #define MOTOR_PIN_1 GPIO_NUM_5
+#define MIN_TOF_VALUE 20
 
 uint16_t rangeMeasurement = 0;
 
@@ -77,29 +78,6 @@ enum STARTUP_CONFIG{
     START_ENEMY_BACK,
 } startupConfig;
 
-/*
-void foo(){
-
-    gpio_config_t io_conf = {};
-
-    // Configure pins for MotorA
-    io_conf.intr_type = GPIO_INTR_DISABLE;
-    io_conf.mode = GPIO_MODE_INPUT;
-    io_conf.pin_bit_mask = (1 << GPIO_NUM_23);
-    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-    io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
-    gpio_config(&io_conf);
-
-    // Configure pins for MotorA
-    io_conf.intr_type = GPIO_INTR_DISABLE;
-    io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask = (1 << GPIO_NUM_2);
-    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
-    gpio_config(&io_conf);
-
-}
-*/
 
 // Micro FSM Moore
 enum STATES{
@@ -138,15 +116,8 @@ void Init()
 
     EnableWifi();
 
-    // Store line value
-    sensors.updateLine();
 
-    sensors.getLine(lineSensorData);
 
-    lineStartValue[0] = lineSensorData[0];
-    lineStartValue[1] = lineSensorData[1];
-    
-    ESP_LOGE(TAG, "Valor linea inicio: %lu, %lu", lineStartValue[0], lineStartValue[1]);
 
     startupConfig = (STARTUP_CONFIG)loadConfig();
 
@@ -181,8 +152,20 @@ void Init()
     vTaskDelay(pdMS_TO_TICKS(5000));
     informer.setStatus(Informer::RUNNING);
     ESP_LOGE(TAG, "Robot encendido");
+    
+    // Store line value
+    sensors.updateLine();
+    sensors.getLine(lineSensorData);
+    lineStartValue[0] = lineSensorData[0];
+    lineStartValue[1] = lineSensorData[1];
+    
+    ESP_LOGE(TAG, "Valor linea inicio: %lu, %lu", lineStartValue[0], lineStartValue[1]);
 }
 
+inline uint8_t isTofActivated(uint8_t index)
+{
+    return ((tofSensorData[index] > 30) && (tofSensorData[index] < 150));
+}
 
 
 void loopSearching();
@@ -215,12 +198,30 @@ void loopEvading()
 
 void loopAttack()
 {
-    ESP_LOGE(TAG," Loop Attack...");
     informer.setStatus(Informer::TARGET_ADQUIRED);
-    motors.setDirection(MotorController::FWD);
-    rangeMeasurement = tofSensorData[0];
-    if (rangeMeasurement > 200)
+
+    if ( isTofActivated(0) )
     {
+        //motors.setDirection(MotorController::FWD);
+        motors.setDirection(MotorController::STOP);
+    }
+    else if(isTofActivated(1))
+    {
+        motors.setDirection(MotorController::LEFT);
+    }
+    else if(isTofActivated(2))
+    {
+        motors.setDirection(MotorController::RIGHT);
+    }
+    
+    if (
+        !isTofActivated(0) &&
+        !isTofActivated(1) &&
+        !isTofActivated(2) )
+    {
+        ESP_LOGE(TAG,"Switching to SEARCH MODE");
+        ESP_LOGE(TAG,"%d, %d, %d", isTofActivated(0), isTofActivated(1), isTofActivated(2));
+        ESP_LOGE(TAG,"Sensor: %lu, %lu, %lu", tofSensorData[0], tofSensorData[1], tofSensorData[2]);
         changeState(SEARCHING);
     }
 }
@@ -238,6 +239,7 @@ void loopRotating()
     if (remainingRotation <= 0)
     {
         // Volvemos a ir recto
+        ESP_LOGE(TAG, "End rotating");
         isRotating = 0;
     }
     remainingRotation -= esp_timer_get_time() - lastmicros;
@@ -250,18 +252,30 @@ void loopSearching()
 {   
     //ESP_LOGE(TAG," Loop Searching...");
 
+    if ( isTofActivated(0) || 
+         isTofActivated(1) ||
+         isTofActivated(2)   )
+    {
+        ESP_LOGE(TAG,"Switching to ATTACK MODE");
+        ESP_LOGE(TAG,"%d, %d, %d", isTofActivated(0), isTofActivated(1), isTofActivated(2));
+        ESP_LOGE(TAG,"Sensor: %lu, %lu, %lu", tofSensorData[0], tofSensorData[1], tofSensorData[2]);
+        changeState(ATTACKING);
+    }
+
     if( !isRotating)
     {
-        motors.setDirection(MotorController::FWD);  
-        if ( lineSensorData[0] >  lineStartValue[0] * 1.25)
+        //motors.setDirection(MotorController::FWD);  
+        if ( lineSensorData[0] <  lineStartValue[0] * 0.8)
         {
-            motors.setDirection(MotorController::RIGHT);
+            ESP_LOGE(TAG,"LINE SENSOR 0 ACTIVATED");
+            motors.setDirection(MotorController::LEFT);
             isRotating = 1;
             remainingRotation = 300000;
         }
-        else if ( lineSensorData[1] >  lineStartValue[1] * 1.25)
+        else if ( lineSensorData[1] <  lineStartValue[1] * 0.8)
         {
-            motors.setDirection(MotorController::LEFT);
+            ESP_LOGE(TAG,"LINE SENSOR 1 ACTIVATED");
+            motors.setDirection(MotorController::RIGHT);
             isRotating = 1;
             remainingRotation = 300000;
         }
@@ -270,8 +284,6 @@ void loopSearching()
     {
         loopRotating();
     }
-
-    rangeMeasurement = tofSensorData[0];
 
 
     /*if (rangeMeasurement < 200)
@@ -375,6 +387,7 @@ void doCommand()
 
 void coreAThread(void *arg)
 {
+    static uint64_t lastmicros = esp_timer_get_time();
     ESP_LOGE(TAG, "Iniciando CORE A");
     uint32_t counter = 0;
 
@@ -382,23 +395,33 @@ void coreAThread(void *arg)
     {
         sensors.getTof(tofSensorData);
         sensors.getLine(lineSensorData);
-        //ESP_LOGE(TAG,"Sensor: %lu, %lu, %lu", tofSensorData[0], tofSensorData[1], tofSensorData[2]);
-        ESP_LOGE(TAG,"Lineas :%lu, %lu", lineSensorData[0], lineSensorData[1]);
+        if (tofSensorData[0] > 8000)
+        {
+            tofSensorData[0] = 0;
+        }
+        if (tofSensorData[1] > 8000)
+        {
+            tofSensorData[1] = 0;
+        }
+        if (tofSensorData[2] > 8000)
+        {
+            tofSensorData[2] = 0;
+        }
+        ESP_LOGE(TAG,"Sensor: %lu, %lu, %lu", tofSensorData[0], tofSensorData[1], tofSensorData[2]);
+        //ESP_LOGE(TAG,"Lineas :%lu, %lu", lineSensorData[0], lineSensorData[1]);
 
         if(!commandRunning)
         {
-            // Check dohyo lines
-            // if true: currentState = Evading
-
             // loop of current state
             funcs[currentState]();
         }
 
         #ifdef ENABLE_OTA
         // Recibir comandos y autoactualizarnos
-        if(counter%10 == 0)
+        if(esp_timer_get_time() > lastmicros + 500000)
         {
             doCommand();
+            lastmicros = esp_timer_get_time();
         }
         counter++;
         #endif
@@ -415,7 +438,7 @@ void coreBThread(void *arg)
     while(true){
         sensors.updadeTof();
         sensors.updateLine();
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(pdMS_TO_TICKS(2));
     }
 }
 

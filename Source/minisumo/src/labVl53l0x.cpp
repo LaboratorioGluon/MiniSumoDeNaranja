@@ -33,12 +33,46 @@ bool labVL53L0X::Init(VL53L0X_DeviceModes devMode)
         return false;
     }
 
-    if (!setTimingBudget(60000))
+
+    
+    if (!setTimingBudget(20000))
         return false;
 
     VL53L0X_StartMeasurement(&vl53l0x_dev);
 
     return true;
+}
+
+bool labVL53L0X::setThresholds(uint32_t rate, uint32_t threshold)
+{
+    //VL53L0X_SetReferenceSpads(&vl53l0x_dev, 6, 1);
+    if (VL53L0X_ERROR_NONE != VL53L0X_SetLimitCheckEnable(&vl53l0x_dev, 
+                                VL53L0X_CHECKENABLE_SIGNAL_RATE_FINAL_RANGE,
+                                1))
+    {
+        return false;
+    }
+
+    if (VL53L0X_ERROR_NONE != VL53L0X_SetLimitCheckValue(&vl53l0x_dev, 
+                                VL53L0X_CHECKENABLE_SIGNAL_RATE_FINAL_RANGE,
+                                (FixPoint1616_t)(rate * 65536 / 100)))
+    {
+        return false;
+    }
+
+    if (VL53L0X_ERROR_NONE != VL53L0X_SetLimitCheckEnable(&vl53l0x_dev, 
+                                VL53L0X_CHECKENABLE_RANGE_IGNORE_THRESHOLD,
+                                1))
+    {
+        return false;
+    }
+
+    if (VL53L0X_ERROR_NONE != VL53L0X_SetLimitCheckValue(&vl53l0x_dev, 
+                                VL53L0X_CHECKENABLE_RANGE_IGNORE_THRESHOLD,
+                                (FixPoint1616_t)(threshold * 65536 / 100)))
+    {
+        return false;
+    }
 }
 
 bool labVL53L0X::readSingleWithPolling(uint16_t *pRangeMilliMeter)

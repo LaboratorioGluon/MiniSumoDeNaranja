@@ -81,14 +81,14 @@ void MotorController::Init()
 
 void MotorController::setDirection(DIRECTION dir)
 {
-    
+    return;
     switch(dir)
     {
         case DIRECTION::STOP: 
-            gpio_set_level(motorA1, 0);
-            gpio_set_level(motorA2, 0);
-            gpio_set_level(motorB1, 0);
-            gpio_set_level(motorB2, 0);
+            gpio_set_level(motorA1, 1);
+            gpio_set_level(motorA2, 1);
+            gpio_set_level(motorB1, 1);
+            gpio_set_level(motorB2, 1);
             break;
         case DIRECTION::BACK: 
             gpio_set_level(motorA1, 1);

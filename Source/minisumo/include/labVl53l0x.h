@@ -21,6 +21,8 @@ public:
 
     bool Init(VL53L0X_DeviceModes devMode);
 
+    bool setThresholds(uint32_t rate, uint32_t threshold);
+
 
     /* Reading functions */
     bool readSingleWithPolling(uint16_t *pRangeMilliMeter);
