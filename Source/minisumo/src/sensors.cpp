@@ -81,17 +81,21 @@ void Sensors::updadeTof()
 
 void Sensors::updateLine()
 {
+    uint32_t newLineData[NUM_LINE_SENSORS];
     if(xSemaphoreTake(semaphore, portMAX_DELAY) == pdTRUE)
     {
         // Get configuration
-        lineData[0] = 0;
-        lineData[1] = 0;
+        newLineData[0] = 0;
+        newLineData[1] = 0;
         for(uint8_t i =0; i < 5; i++){
-            lineData[0] += adc1_get_raw(ADC1_CHANNEL_0);
-            lineData[1] += adc1_get_raw(ADC1_CHANNEL_3);
+            newLineData[0] += adc1_get_raw(ADC1_CHANNEL_0);
+            newLineData[1] += adc1_get_raw(ADC1_CHANNEL_3);
         }
-        lineData[0] /= 5;
-        lineData[1] /= 5;
+        newLineData[0] /= 5;
+        newLineData[1] /= 5;
+
+        lineData[0] = newLineData[0];
+        lineData[1] = newLineData[1];
 
         /*ESP_LOGE(TAG, "Line 0 : %lu", lineData[0]);
         ESP_LOGE(TAG, "Line 1 : %lu", lineData[1]);*/

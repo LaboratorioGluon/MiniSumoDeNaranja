@@ -30,7 +30,7 @@ private:
     i2cExpander tca;
 
     uint32_t tofRateValue[NUM_TOF_SENSORS] = {70,70,80};
-    uint32_t tofThresholdValue[NUM_TOF_SENSORS] = {95,95,97};
+    uint32_t tofThresholdValue[NUM_TOF_SENSORS] = {95,95,98};
 
     uint32_t lastTofValues[NUM_TOF_SENSORS] = {0,0,0};
 
