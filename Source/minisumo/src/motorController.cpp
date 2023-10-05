@@ -81,7 +81,6 @@ void MotorController::Init()
 
 void MotorController::setDirection(DIRECTION dir)
 {
-    return;
     switch(dir)
     {
         case DIRECTION::STOP: 

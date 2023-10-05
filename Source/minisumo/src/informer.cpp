@@ -48,13 +48,15 @@ void Informer::setStatus(enum STATUS st)
         LedGPeriod = 100000;
         break;
     case RUNNING:
+        LedRPeriod = -1;
         LedGPeriod = 0;
         break;
-    case FAILED:
+    /*case FAILED:
         LedRPeriod = 0;
-        break;
+        break;*/
     case TARGET_ADQUIRED:
-        LedRPeriod = 200000;
+        LedRPeriod = 0;
+        LedGPeriod = -1;
         break;
     default:
         break;

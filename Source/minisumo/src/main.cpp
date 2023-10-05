@@ -25,7 +25,7 @@
 
 static char TAG[] = "MAIN";
 
-#define ENABLE_OTA
+//#define ENABLE_OTA
 
 #ifdef ENABLE_OTA
     extern "C" void wifi_init_sta();
@@ -55,6 +55,11 @@ uint16_t tofSensorData[NUM_TOF_SENSORS];
 uint32_t lineSensorData[NUM_LINE_SENSORS];
 uint32_t lineStartValue[NUM_LINE_SENSORS];
 
+uint64_t lastmicros;
+uint8_t isRotating = 0;
+int64_t remainingRotation=0;
+uint32_t isEnemyDown = 0;
+
 uint8_t isrTriggered = 0;
 
 static TaskHandle_t initTask = NULL;
@@ -71,11 +76,11 @@ static void IRAM_ATTR gpio_isr_handler(void* arg)
 }
 
 enum STARTUP_CONFIG{
-    START_INVALID_CONFIG = -1,
-    START_ENEMY_FWD = 0,
-    START_ENEMY_RIGHT,
-    START_ENEMY_LEFT,
-    START_ENEMY_BACK,
+    START_INVALID_CONFIG = -1, 
+    START_ENEMY_FWD = 0, // 0000
+    START_ENEMY_RIGHT,   // 0001
+    START_ENEMY_LEFT,    // 0010
+    START_ENEMY_BACK,    // 0011
 } startupConfig;
 
 
@@ -160,11 +165,38 @@ void Init()
     lineStartValue[1] = lineSensorData[1];
     
     ESP_LOGE(TAG, "Valor linea inicio: %lu, %lu", lineStartValue[0], lineStartValue[1]);
+
+    switch (startupConfig)
+    {
+    case START_INVALID_CONFIG:
+        break;
+    case START_ENEMY_FWD:
+        break;
+    case START_ENEMY_RIGHT:
+        isRotating = 1;
+        motors.setDirection(MotorController::RIGHT);
+        remainingRotation = 300000;
+        break;
+    case START_ENEMY_LEFT:
+        isRotating = 1;
+        motors.setDirection(MotorController::LEFT);
+        remainingRotation = 300000;
+        break;
+    case START_ENEMY_BACK:
+        motors.setDirection(MotorController::RIGHT);
+        remainingRotation = 600000;
+        break;
+    }
 }
 
 inline uint8_t isTofActivated(uint8_t index)
 {
     return ((tofSensorData[index] > 30) && (tofSensorData[index] < 150));
+}
+
+inline uint8_t isLineActivated(uint8_t index)
+{
+    return lineSensorData[index] <  lineStartValue[index] * 0.8;
 }
 
 
@@ -200,10 +232,22 @@ void loopAttack()
 {
     informer.setStatus(Informer::TARGET_ADQUIRED);
 
+    if ( isLineActivated(0) && isLineActivated(1))
+    {
+        ESP_LOGE(TAG, "Rotating while in attack");
+        isEnemyDown = 1;
+        motors.setDirection(MotorController::BACK);
+        vTaskDelay(pdMS_TO_TICKS(300));
+        motors.setDirection(MotorController::RIGHT);
+        isRotating = 1;
+        remainingRotation = 300000;
+        changeState(SEARCHING);
+    }
+
     if ( isTofActivated(0) )
     {
-        //motors.setDirection(MotorController::FWD);
-        motors.setDirection(MotorController::STOP);
+        motors.setDirection(MotorController::FWD);
+        //motors.setDirection(MotorController::STOP);
     }
     else if(isTofActivated(1))
     {
@@ -227,20 +271,22 @@ void loopAttack()
 }
 
 
-uint8_t isRotating = 0;
-int32_t remainingRotation=0;
-int32_t remainingBack=0;
-#define DELTA_ROT 1
+
+void startRotating(uint64_t rotatingTime)
+{
+    lastmicros = esp_timer_get_time();
+    remainingRotation = rotatingTime;
+    isRotating = 1;
+}
 
 void loopRotating()
 {
-    static uint64_t lastmicros = esp_timer_get_time();
-
     if (remainingRotation <= 0)
     {
         // Volvemos a ir recto
         ESP_LOGE(TAG, "End rotating");
         isRotating = 0;
+        isEnemyDown = 0;
     }
     remainingRotation -= esp_timer_get_time() - lastmicros;
     lastmicros = esp_timer_get_time();
@@ -250,34 +296,38 @@ void loopRotating()
 
 void loopSearching()
 {   
-    //ESP_LOGE(TAG," Loop Searching...");
-
-    if ( isTofActivated(0) || 
-         isTofActivated(1) ||
-         isTofActivated(2)   )
+    informer.setStatus(Informer::RUNNING);
+    if(isEnemyDown == 0)
     {
-        ESP_LOGE(TAG,"Switching to ATTACK MODE");
-        ESP_LOGE(TAG,"%d, %d, %d", isTofActivated(0), isTofActivated(1), isTofActivated(2));
-        ESP_LOGE(TAG,"Sensor: %lu, %lu, %lu", tofSensorData[0], tofSensorData[1], tofSensorData[2]);
-        changeState(ATTACKING);
+        if (isTofActivated(0) || 
+            isTofActivated(1) ||
+            isTofActivated(2)   )
+        {
+            /*ESP_LOGE(TAG,"Switching to ATTACK MODE");
+            ESP_LOGE(TAG,"%d, %d, %d", isTofActivated(0), isTofActivated(1), isTofActivated(2));
+            ESP_LOGE(TAG,"Sensor: %lu, %lu, %lu", tofSensorData[0], tofSensorData[1], tofSensorData[2]);*/
+            //changeState(ATTACKING);
+        }
     }
 
     if( !isRotating)
     {
-        //motors.setDirection(MotorController::FWD);  
-        if ( lineSensorData[0] <  lineStartValue[0] * 0.8)
+        motors.setDirection(MotorController::FWD);  
+        if ( isLineActivated(0) )
         {
+            /*motors.setDirection(MotorController::BACK);
+            vTaskDelay(pdMS_TO_TICKS(300));*/
             ESP_LOGE(TAG,"LINE SENSOR 0 ACTIVATED");
             motors.setDirection(MotorController::LEFT);
-            isRotating = 1;
-            remainingRotation = 300000;
+            startRotating(300000);
         }
-        else if ( lineSensorData[1] <  lineStartValue[1] * 0.8)
+        else if ( isLineActivated(1) )
         {
+            /*motors.setDirection(MotorController::BACK);
+            vTaskDelay(pdMS_TO_TICKS(300));*/
             ESP_LOGE(TAG,"LINE SENSOR 1 ACTIVATED");
             motors.setDirection(MotorController::RIGHT);
-            isRotating = 1;
-            remainingRotation = 300000;
+            startRotating(300000);
         }
     }
     else
@@ -285,16 +335,6 @@ void loopSearching()
         loopRotating();
     }
 
-
-    /*if (rangeMeasurement < 200)
-    {
-        changeState(ATTACKING);
-    }*/
-
-    /*if(esp_timer_get_time() > currentStateStart + 5000000)
-    {
-        changeState(ATTACKING);
-    }*/
 }
 
 enum CMD{
@@ -389,26 +429,14 @@ void coreAThread(void *arg)
 {
     static uint64_t lastmicros = esp_timer_get_time();
     ESP_LOGE(TAG, "Iniciando CORE A");
-    uint32_t counter = 0;
 
     while(true)
     {
         sensors.getTof(tofSensorData);
         sensors.getLine(lineSensorData);
-        if (tofSensorData[0] > 8000)
-        {
-            tofSensorData[0] = 0;
-        }
-        if (tofSensorData[1] > 8000)
-        {
-            tofSensorData[1] = 0;
-        }
-        if (tofSensorData[2] > 8000)
-        {
-            tofSensorData[2] = 0;
-        }
-        ESP_LOGE(TAG,"Sensor: %lu, %lu, %lu", tofSensorData[0], tofSensorData[1], tofSensorData[2]);
-        //ESP_LOGE(TAG,"Lineas :%lu, %lu", lineSensorData[0], lineSensorData[1]);
+
+        //ESP_LOGE(TAG,"Sensor: %lu, %lu, %lu", tofSensorData[0], tofSensorData[1], tofSensorData[2]);
+        ESP_LOGE(TAG,"Lineas :%lu, %lu", lineSensorData[0], lineSensorData[1]);
 
         if(!commandRunning)
         {
@@ -426,9 +454,7 @@ void coreAThread(void *arg)
         counter++;
         #endif
         
-        //informer.Update();
-        //vTaskDelay(pdMS_TO_TICKS(200));
-        //taskYIELD();
+        taskYIELD();
     }
 }
 
@@ -450,7 +476,7 @@ void app_main()
     Init();
     
 
-    xTaskCreatePinnedToCore(coreAThread, "Main_core",   4096, NULL, 10, &mainCoreHandle, 0);
-    xTaskCreatePinnedToCore(coreBThread, "Sensor_Core", 4096, NULL, 10, &sensorCoreHandle, 1);
+    xTaskCreatePinnedToCore(coreBThread, "Sensor_Core", 4096, NULL, 9, &sensorCoreHandle, 1);
+    xTaskCreatePinnedToCore(coreAThread, "Main_core",   4096, NULL, 10, &mainCoreHandle, 0);    
 
 }

@@ -7,6 +7,8 @@
 static char TAG[] = "SENSORS";
 SemaphoreHandle_t semaphore;
 
+#define ALPHA 0.9f
+
 Sensors::Sensors(): tca(GPIO_NUM_21, GPIO_NUM_22)
 {
     
@@ -64,7 +66,12 @@ void Sensors::updadeTof()
         {
             tca.selectPort(i);
             rangeSensor.readContiniousLastData(&rangeMeasurement[i]);
-            //ESP_LOGE(TAG, "Sensor %u (%d) : %lu", i, ret, rangeMeasurement[i]);
+            //ESP_LOGE(TAG, "Sensor %u (%d) : %lu", i,  rangeMeasurement[i]);
+            if ( rangeMeasurement[i] > 8000 )
+            {
+                rangeMeasurement[i] = 0;
+            }
+            rangeMeasurement[i] = rangeMeasurement[i]*ALPHA + tofData[i]*(1-ALPHA);
         }
 
         memcpy(tofData, rangeMeasurement, NUM_TOF_SENSORS*sizeof(tofData[0]));

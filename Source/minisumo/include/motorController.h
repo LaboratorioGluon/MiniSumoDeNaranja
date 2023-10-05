@@ -15,7 +15,9 @@ public:
         STOP = 0,
         FWD,
         RIGHT,
+        SOFT_RIGHT,
         LEFT,
+        SOFT_LEFT,
         BACK
     };
 

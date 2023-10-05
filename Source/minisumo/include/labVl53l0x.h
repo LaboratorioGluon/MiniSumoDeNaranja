@@ -22,6 +22,8 @@ public:
     bool Init(VL53L0X_DeviceModes devMode);
 
     bool setThresholds(uint32_t rate, uint32_t threshold);
+    
+    bool setSPads(uint32_t padCount, uint32_t isAperture);
 
 
     /* Reading functions */
