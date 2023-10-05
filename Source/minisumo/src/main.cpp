@@ -187,14 +187,14 @@ void Init()
         break;
     case START_ENEMY_BACK:
         motors.setDirection(MotorController::RIGHT);
-        startRotating(300000);
+        startRotating(600000);
         break;
     }
 }
 
 inline uint8_t isTofActivated(uint8_t index)
 {
-    return ((tofSensorData[index] > 30) && (tofSensorData[index] < 200));
+    return ((tofSensorData[index] > 30) && (tofSensorData[index] < 650));
 }
 
 inline uint8_t isLineActivated(uint8_t index)
@@ -238,7 +238,7 @@ void attackCheckLine()
     {
         motors.setDirection(MotorController::BACK);
         vTaskDelay(pdMS_TO_TICKS(100));
-        ESP_LOGE(TAG, "ATK LINE SENSOR 0 ACTIVATED");
+        //ESP_LOGE(TAG, "ATK LINE SENSOR 0 ACTIVATED");
         motors.setDirection(MotorController::LEFT);
         startRotating(300000);
     }
@@ -246,7 +246,7 @@ void attackCheckLine()
     {
         motors.setDirection(MotorController::BACK);
         vTaskDelay(pdMS_TO_TICKS(100));
-        ESP_LOGE(TAG, "ATK LINE SENSOR 1 ACTIVATED");
+        //ESP_LOGE(TAG, "ATK LINE SENSOR 1 ACTIVATED");
         motors.setDirection(MotorController::RIGHT);
         startRotating(300000);
     }
@@ -260,7 +260,7 @@ void loopAttack()
     if (isTofActivated(0))
     {
         motors.setDirection(MotorController::FWD);
-        ESP_LOGE(TAG, "ATTACK: NORMAL FWD");
+        //ESP_LOGE(TAG, "ATTACK: NORMAL FWD");
         attackCheckLine();
 
         /*if (prevLineActivated[0] == 0 && prevLineActivated[1] == 0)
@@ -313,13 +313,13 @@ void loopAttack()
     }
     else if (isTofActivated(1))
     {
-        ESP_LOGE(TAG, "ATTACK: NORMAL LEFT");
+        //ESP_LOGE(TAG, "ATTACK: NORMAL LEFT");
         motors.setDirection(MotorController::LEFT);
         attackCheckLine();
     }
     else if (isTofActivated(2))
     {
-        ESP_LOGE(TAG, "ATTACK: NORMAL RIGHT");
+        //ESP_LOGE(TAG, "ATTACK: NORMAL RIGHT");
         motors.setDirection(MotorController::RIGHT);
         attackCheckLine();
     }
@@ -329,9 +329,9 @@ void loopAttack()
         !isTofActivated(1) &&
         !isTofActivated(2))
     {
-        ESP_LOGE(TAG, "Switching to SEARCH MODE");
+        /*ESP_LOGE(TAG, "Switching to SEARCH MODE");
         ESP_LOGE(TAG, "%d, %d, %d", isTofActivated(0), isTofActivated(1), isTofActivated(2));
-        ESP_LOGE(TAG, "Sensor: %lu, %lu, %lu", tofSensorData[0], tofSensorData[1], tofSensorData[2]);
+        ESP_LOGE(TAG, "Sensor: %lu, %lu, %lu", tofSensorData[0], tofSensorData[1], tofSensorData[2]);*/
         changeState(SEARCHING);
     }
 }
@@ -358,9 +358,9 @@ void loopSearching()
             isTofActivated(1) ||
             isTofActivated(2))
         {
-            ESP_LOGE(TAG, "Switching to ATTACK MODE");
+            /*ESP_LOGE(TAG, "Switching to ATTACK MODE");
             ESP_LOGE(TAG, "%d, %d, %d", isTofActivated(0), isTofActivated(1), isTofActivated(2));
-            ESP_LOGE(TAG, "Sensor: %lu, %lu, %lu", tofSensorData[0], tofSensorData[1], tofSensorData[2]);
+            ESP_LOGE(TAG, "Sensor: %lu, %lu, %lu", tofSensorData[0], tofSensorData[1], tofSensorData[2]);*/
             changeState(ATTACKING);
         }
     }

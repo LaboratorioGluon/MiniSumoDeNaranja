@@ -24,19 +24,19 @@ int8_t loadConfig()
     {
         configuration = 0;
     }
-    else if(adc_raw < 918) // 0001
+    else if(adc_raw < 1506) // 0001
     {
         configuration = 1;
     }
-    else if ( adc_raw < 1381) // 0010
+    else if ( adc_raw < 2065) // 0010
     {
         configuration = 2;
     }
-    else if ( adc_raw < 1720) // 0011
+    else if ( adc_raw < 2441) // 0011
     {
         configuration = 3;
     }
-    else if (adc_raw < 1981) // 0100
+    else if (adc_raw < 2708) // 0100
     {
         // Intentionally empty
     }
