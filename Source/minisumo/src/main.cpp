@@ -150,6 +150,7 @@ void Init()
     io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
     io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
     gpio_config(&io_conf);
+    gpio_set_level(GPIO_NUM_35, 1);
 
     gpio_install_isr_service(0);
     gpio_isr_handler_add(GPIO_NUM_35, gpio_isr_handler, nullptr);
@@ -532,4 +533,6 @@ void app_main()
 
     xTaskCreatePinnedToCore(coreBThread, "Sensor_Core", 4096, NULL, 9, &sensorCoreHandle, 1);
     xTaskCreatePinnedToCore(coreAThread, "Main_core", 4096, NULL, 10, &mainCoreHandle, 0);
+    
+    
 }

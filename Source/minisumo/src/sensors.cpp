@@ -97,8 +97,8 @@ void Sensors::updateLine()
         lineData[0] = newLineData[0];
         lineData[1] = newLineData[1];
 
-        /*ESP_LOGE(TAG, "Line 0 : %lu", lineData[0]);
-        ESP_LOGE(TAG, "Line 1 : %lu", lineData[1]);*/
+        ESP_LOGE(TAG, "Line 0 : %lu", lineData[0]);
+        ESP_LOGE(TAG, "Line 1 : %lu", lineData[1]);
 
     }
     xSemaphoreGive(semaphore);
